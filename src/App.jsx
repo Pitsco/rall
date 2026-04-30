@@ -179,9 +179,9 @@ function HoldModel({ type, color, position }) {
 
   const scaleMap = {
     jug: 0.01,
-    crimp: 0.01,
+    crimp: 0.50,
     sloper: 0.01,
-    pinch: 0.01,
+    pinch: 0.50,
   };
 
   return (
