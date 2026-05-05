@@ -1,51 +1,9 @@
 import React, { Suspense, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Text, useGLTF } from '@react-three/drei';
-
-const DEFAULT_CODE = `wall MainWall {
-  height 15
-  width 10
-  angle 8
-}
-
-route "Easy" on MainWall {
-  color "green"
-  grade "V1"
-  hold "jug" at (1.5, 2.0, 0.18)
-  hold "jug" at (2.2, 4.0, 0.18)
-  hold "pinch" at (3.0, 6.0, 0.18)
-  hold "sloper" at (3.8, 8.5, 0.18)
-}
-
-route "Flow" on MainWall {
-  color "blue"
-  grade "V3"
-  hold "crimp" at (5.8, 2.5, 0.18)
-  hold "pinch" at (5.1, 4.6, 0.18)
-  hold "crimp" at (6.2, 6.8, 0.18)
-  hold "sloper" at (5.6, 9.2, 0.18)
-}
-
-route "Power" on MainWall {
-  color "red"
-  grade "V5"
-  hold "jug" at (8.0, 2.2, 0.18)
-  hold "crimp" at (7.3, 4.3, 0.18)
-  hold "pinch" at (8.4, 6.4, 0.18)
-  hold "crimp" at (7.8, 9.0, 0.18)
-}`;
-
-const COLOR_MAP = {
-  red: '#e85a3d',
-  blue: '#3f7fe8',
-  green: '#4fa65a',
-  yellow: '#d6ae2b',
-  orange: '#e67e22',
-  purple: '#8b5cf6',
-  pink: '#ec4899',
-  black: '#222222',
-  white: '#f8f7f4',
-};
+import { DEFAULT_CODE } from './rall/samples';
+import { parseRall } from './rall/parser';
+import { interpretRall } from './rall/interpreter';
 
 const HOLD_MODEL_PATHS = {
   jug: '/models/holds/jug.glb',
@@ -53,56 +11,6 @@ const HOLD_MODEL_PATHS = {
   sloper: '/models/holds/sloper.glb',
   pinch: '/models/holds/pinch.glb',
 };
-
-function parseCrux(source) {
-  const wallMatch = source.match(/wall\s+(\w+)\s*\{([\s\S]*?)\}/);
-  if (!wallMatch) {
-    throw new Error('Missing wall block. Example: wall MainWall { height 15 width 10 angle 8 }');
-  }
-
-  const wallName = wallMatch[1];
-  const wallBody = wallMatch[2];
-  const height = Number((wallBody.match(/height\s+([\d.]+)/) || [])[1] || 15);
-  const width = Number((wallBody.match(/width\s+([\d.]+)/) || [])[1] || 10);
-  const angle = Number((wallBody.match(/angle\s+([\d.]+)/) || [])[1] || 0);
-
-  const routeRegex = /route\s+"([^"]+)"\s+on\s+(\w+)\s*\{([\s\S]*?)\}/g;
-  const routes = [];
-  let routeMatch;
-
-  while ((routeMatch = routeRegex.exec(source)) !== null) {
-    const name = routeMatch[1];
-    const targetWall = routeMatch[2];
-    const body = routeMatch[3];
-
-    if (targetWall !== wallName) continue;
-
-    const colorRaw = ((body.match(/color\s+"([^"]+)"/) || [])[1] || 'orange').toLowerCase();
-    const grade = (body.match(/grade\s+"([^"]+)"/) || [])[1] || 'V0';
-    const holds = [];
-    const holdRegex = /hold\s+"([^"]+)"\s+at\s*\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/g;
-    let holdMatch;
-
-    while ((holdMatch = holdRegex.exec(body)) !== null) {
-      holds.push({
-        type: holdMatch[1].toLowerCase(),
-        x: Number(holdMatch[2]),
-        y: Number(holdMatch[3]),
-        z: Number(holdMatch[4]),
-      });
-    }
-
-    routes.push({
-      name,
-      colorName: colorRaw,
-      color: COLOR_MAP[colorRaw] || colorRaw,
-      grade,
-      holds,
-    });
-  }
-
-  return { wall: { name: wallName, height, width, angle }, routes };
-}
 
 function PrimitiveHold({ type, color, position }) {
   const materialProps = { color, roughness: 0.82, metalness: 0.03 };
@@ -179,9 +87,9 @@ function HoldModel({ type, color, position }) {
 
   const scaleMap = {
     jug: 0.01,
-    crimp: 0.50,
+    crimp: 0.5,
     sloper: 0.01,
-    pinch: 0.50,
+    pinch: 0.5,
   };
 
   return (
@@ -213,31 +121,17 @@ useGLTF.preload('/models/holds/pinch.glb');
 
 function RouteLabels({ wall }) {
   return (
-    <Text
-      position={[wall.width / 2, wall.height + 2.0, 0.35]}
-      fontSize={0.48}
-      color="#4b5563"
-      anchorX="center"
-      anchorY="middle"
-    >
+    <Text position={[wall.width / 2, wall.height + 2.0, 0.35]} fontSize={0.48} color="#4b5563" anchorX="center" anchorY="middle">
       {wall.name}
     </Text>
   );
 }
 
-function PanelBoltHoles({
-  width,
-  height,
-  spacingX = 0.78,
-  spacingY = 0.78,
-  z = 0.155,
-  offsetX = 0,
-  offsetY = 0,
-}) {
+function PanelBoltHoles({ width, height, spacingX = 0.78, spacingY = 0.78, z = 0.155, offsetX = 0, offsetY = 0 }) {
   const holes = [];
 
-  for (let x = 0.45; x <= width - 0.25; x += spacingX) {
-    for (let y = 0.45; y <= height - 0.25; y += spacingY) {
+  for (let x = 0.5; x <= width - 0.5; x += spacingX) {
+    for (let y = 0.5; y <= height - 0.5; y += spacingY) {
       holes.push(
         <mesh key={`${offsetX + x}-${offsetY + y}`} position={[offsetX + x, offsetY + y, z]}>
           <cylinderGeometry args={[0.028, 0.028, 0.025, 12]} />
@@ -251,42 +145,25 @@ function PanelBoltHoles({
 }
 
 function FrontPanels({ wall }) {
-  const panelColorA = '#d8d4ce';
-  const panelColorB = '#d2cec8';
-  const seamColor = '#cbc6bf';
-
   return (
     <group>
-      <mesh receiveShadow castShadow position={[1.9, wall.height / 2, 0]}>
-        <boxGeometry args={[3.8, wall.height, 0.3]} />
-        <meshStandardMaterial color={panelColorA} roughness={0.98} metalness={0.01} />
+      <mesh
+        receiveShadow
+        castShadow
+        position={[wall.width / 2, wall.height / 2, 0]}
+      >
+        <boxGeometry args={[wall.width, wall.height, 0.3]} />
+        <meshStandardMaterial
+          color="#d8d4ce"
+          roughness={0.98}
+          metalness={0.01}
+        />
       </mesh>
-      <PanelBoltHoles width={3.8} height={wall.height} offsetX={0} offsetY={0} />
 
-      <mesh receiveShadow castShadow position={[5.0, wall.height / 2 + 0.1, 0]}>
-        <boxGeometry args={[2.4, wall.height, 0.3]} />
-        <meshStandardMaterial color={panelColorB} roughness={0.98} metalness={0.01} />
-      </mesh>
-      <PanelBoltHoles width={2.4} height={wall.height} offsetX={3.8} offsetY={0} />
-
-      <mesh receiveShadow castShadow position={[8.0, wall.height / 2 + 0.15, 0]}>
-        <boxGeometry args={[3.6, wall.height, 0.3]} />
-        <meshStandardMaterial color={panelColorA} roughness={0.98} metalness={0.01} />
-      </mesh>
-      <PanelBoltHoles width={3.6} height={wall.height} offsetX={6.2} offsetY={0} />
-
-      <mesh position={[3.8, wall.height / 2, 0.156]}>
-        <boxGeometry args={[0.03, wall.height, 0.01]} />
-        <meshStandardMaterial color={seamColor} />
-      </mesh>
-      <mesh position={[6.2, wall.height / 2, 0.156]}>
-        <boxGeometry args={[0.03, wall.height, 0.01]} />
-        <meshStandardMaterial color={seamColor} />
-      </mesh>
+      <PanelBoltHoles width={wall.width} height={wall.height} />
     </group>
   );
 }
-
 function LeftWing({ wall }) {
   const width = 2.9;
   const height = wall.height - 1.4;
@@ -368,12 +245,7 @@ function FloorPads({ wall }) {
 
   for (let i = 0; i < padCount; i += 1) {
     pads.push(
-      <mesh
-        key={i}
-        receiveShadow
-        castShadow
-        position={[wall.width / 2 - totalWidth / 2 + padWidth / 2 + i * padWidth, -1.42, 1.05]}
-      >
+      <mesh key={i} receiveShadow castShadow position={[wall.width / 2 - totalWidth / 2 + padWidth / 2 + i * padWidth, -1.42, 1.05]}>
         <boxGeometry args={[padWidth - 0.05, 1.05, 6.2]} />
         <meshStandardMaterial color="#7b7c80" roughness={0.92} metalness={0.01} />
       </mesh>
@@ -415,7 +287,7 @@ function WallScene({ data, useRealModels }) {
           <HoldMesh
             key={`${route.name}-${index}`}
             type={hold.type}
-            color={route.color}
+            color={hold.color || route.color}
             position={[hold.x, hold.y, hold.z]}
             useRealModels={useRealModels}
           />
@@ -431,6 +303,7 @@ function Legend({ routes }) {
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-slate-900">Routes</h2>
+
       <div className="mt-3 space-y-2">
         {routes.map((route) => (
           <div key={route.name} className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
@@ -441,6 +314,7 @@ function Legend({ routes }) {
                 <div className="text-sm text-slate-500">{route.holds.length} holds</div>
               </div>
             </div>
+
             <span className="rounded-full bg-stone-200 px-2 py-1 text-xs font-semibold text-slate-700">
               {route.grade}
             </span>
@@ -455,11 +329,37 @@ export default function App() {
   const [code, setCode] = useState(DEFAULT_CODE);
   const [useRealModels, setUseRealModels] = useState(true);
 
+  async function loadExample(fileName) {
+    try {
+      const response = await fetch(`/examples/${fileName}`);
+
+      if (!response.ok) {
+        throw new Error(`Could not load ${fileName}`);
+      }
+
+      const text = await response.text();
+      setCode(text);
+    } catch (error) {
+      setCode(`// Error loading example: ${error.message}`);
+    }
+  }
+
   const parsed = useMemo(() => {
     try {
-      return { data: parseCrux(code), error: null };
+      const ast = parseRall(code);
+      const result = interpretRall(ast);
+
+      return {
+        data: result.scene,
+        output: result.output,
+        error: null,
+      };
     } catch (error) {
-      return { data: null, error: error.message || 'Parse error' };
+      return {
+        data: null,
+        output: [],
+        error: error.message || 'Parse error',
+      };
     }
   }, [code]);
 
@@ -472,15 +372,79 @@ export default function App() {
               <div>
                 <h1 className="text-2xl font-bold">Rall Wall Designer</h1>
                 <p className="mt-1 text-sm text-slate-600">
-                  Write Rall-like route code and preview the wall in 3D.
+                  Write Rall source code, run the interpreter, and preview the climbing wall in 3D.
                 </p>
               </div>
-              <div className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">Prototype</div>
+
+              <div className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+                Interpreter Demo
+              </div>
             </div>
+
             <div className="mt-4 rounded-2xl bg-stone-50 p-3 text-sm text-slate-600">
-              Syntax: <span className="font-mono">wall</span>, <span className="font-mono">route</span>,{' '}
-              <span className="font-mono">color</span>, <span className="font-mono">grade</span>,{' '}
-              <span className="font-mono">hold</span>, <span className="font-mono">at (x,y,z)</span>
+              Syntax:{' '}
+              <span className="font-mono">wall</span>,{' '}
+              <span className="font-mono">route</span>,{' '}
+              <span className="font-mono">color</span>,{' '}
+              <span className="font-mono">grade</span>,{' '}
+              <span className="font-mono">hold</span>,{' '}
+              <span className="font-mono">at (x,y,z)</span>,{' '}
+              <span className="font-mono">for</span>,{' '}
+              <span className="font-mono">if</span>
+            </div>
+
+            <div className="mt-4">
+              <div className="mb-2 text-sm font-semibold text-slate-700">Load Example Programs</div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCode(DEFAULT_CODE)}
+                  className="rounded-xl bg-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-900 hover:bg-emerald-300"
+                >
+                  Default
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => loadExample('hello_wall.rall')}
+                  className="rounded-xl bg-slate-200 px-3 py-1 text-xs font-semibold hover:bg-slate-300"
+                >
+                  Hello Wall
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => loadExample('beginner_route.rall')}
+                  className="rounded-xl bg-slate-200 px-3 py-1 text-xs font-semibold hover:bg-slate-300"
+                >
+                  Beginner Route
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => loadExample('multi_route.rall')}
+                  className="rounded-xl bg-slate-200 px-3 py-1 text-xs font-semibold hover:bg-slate-300"
+                >
+                  Multi Route
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => loadExample('complex_wall.rall')}
+                  className="rounded-xl bg-slate-200 px-3 py-1 text-xs font-semibold hover:bg-slate-300"
+                >
+                  Complex Wall
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => loadExample('fizzbuzz.rall')}
+                  className="rounded-xl bg-purple-200 px-3 py-1 text-xs font-semibold text-purple-900 hover:bg-purple-300"
+                >
+                  FizzBuzz
+                </button>
+              </div>
             </div>
           </div>
 
@@ -490,9 +454,10 @@ export default function App() {
                 <div className="text-sm font-semibold text-slate-800">Hold rendering</div>
                 <div className="text-xs text-slate-500">Uses .glb models from public/models/holds when available</div>
               </div>
+
               <button
                 type="button"
-                onClick={() => setUseRealModels((v) => !v)}
+                onClick={() => setUseRealModels((value) => !value)}
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${
                   useRealModels ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
                 }`}
@@ -502,20 +467,32 @@ export default function App() {
             </div>
 
             <label className="mb-2 block text-sm font-semibold text-slate-700">Rall Source</label>
+
             <textarea
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(event) => setCode(event.target.value)}
               className="h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-950 p-4 font-mono text-sm text-slate-100 outline-none"
               spellCheck={false}
             />
+
             {parsed.error ? (
               <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {parsed.error}
               </div>
             ) : (
-              <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                Parsed successfully.
-              </div>
+              <>
+                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                  Parsed and interpreted successfully.
+                </div>
+
+                <div className="mt-3 rounded-2xl bg-slate-950 p-4 font-mono text-xs text-emerald-300">
+                  <div className="mb-2 text-slate-400">Interpreter Output:</div>
+
+                  {parsed.output.map((line, index) => (
+                    <div key={index}>{`> ${line}`}</div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
@@ -535,6 +512,7 @@ export default function App() {
               <Canvas shadows camera={{ position: [8.5, 5.8, 22], fov: 28 }}>
                 <color attach="background" args={['#f4eee4']} />
                 <ambientLight intensity={1.15} />
+
                 <directionalLight
                   position={[12, 18, 14]}
                   intensity={1.35}
@@ -542,10 +520,13 @@ export default function App() {
                   shadow-mapSize-width={2048}
                   shadow-mapSize-height={2048}
                 />
+
                 <directionalLight position={[-8, 10, 8]} intensity={0.45} />
+
                 <spotLight position={[0, 20, 18]} intensity={0.55} angle={0.45} penumbra={0.8} castShadow />
 
                 <WallScene data={parsed.data} useRealModels={useRealModels} />
+
                 <OrbitControls
                   makeDefault
                   minDistance={12}

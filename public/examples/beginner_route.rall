@@ -1,0 +1,16 @@
+wall BeginnerWall {
+  height 15
+  width 10
+  angle 10
+}
+
+route "Beginner Flow" on BeginnerWall {
+  color "blue"
+  grade "V2"
+
+  hold "jug" at (1.5, 2, 0.18)
+  hold "jug" at (2.5, 4, 0.18)
+  hold "pinch" at (3.5, 6, 0.18)
+  hold "sloper" at (4.5, 8, 0.18)
+  hold "jug" at (5.5, 10, 0.18)
+}

@@ -1,0 +1,14 @@
+wall HelloWall {
+  height 12
+  width 8
+  angle 5
+}
+
+route "Intro" on HelloWall {
+  color "green"
+  grade "V0"
+
+  hold "jug" at (2, 2, 0.18)
+  hold "jug" at (3, 4, 0.18)
+  hold "jug" at (4, 6, 0.18)
+}c

@@ -1,0 +1,35 @@
+wall CompetitionWall {
+  height 18
+  width 14
+  angle 25
+}
+
+route "Dyno Madness" on CompetitionWall {
+  color "purple"
+  grade "V6"
+
+  hold "jug" at (3, 2, 0.18)
+  hold "pinch" at (5, 5, 0.18)
+  hold "sloper" at (7, 8, 0.18)
+  hold "crimp" at (10, 12, 0.18)
+}
+
+route "Technical Face" on CompetitionWall {
+  color "yellow"
+  grade "V5"
+
+  hold "crimp" at (2, 3, 0.18)
+  hold "crimp" at (3, 6, 0.18)
+  hold "pinch" at (4, 9, 0.18)
+  hold "sloper" at (5, 12, 0.18)
+}
+
+route "Power Overhang" on CompetitionWall {
+  color "red"
+  grade "V7"
+
+  hold "jug" at (10, 2, 0.18)
+  hold "pinch" at (11, 5, 0.18)
+  hold "sloper" at (12, 8, 0.18)
+  hold "crimp" at (11, 11, 0.18)
+}
