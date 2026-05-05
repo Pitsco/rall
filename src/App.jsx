@@ -6,10 +6,10 @@ import { parseRall } from './rall/parser';
 import { interpretRall } from './rall/interpreter';
 
 const HOLD_MODEL_PATHS = {
-  jug: '/models/holds/jug.glb',
-  crimp: '/models/holds/crimp.glb',
-  sloper: '/models/holds/sloper.glb',
-  pinch: '/models/holds/pinch.glb',
+  jug: '/rall/models/holds/jug.glb',
+  crimp: '/rall/models/holds/crimp.glb',
+  sloper: '/rall/models/holds/sloper.glb',
+  pinch: '/rall/models/holds/pinch.glb',
 };
 
 function PrimitiveHold({ type, color, position }) {
