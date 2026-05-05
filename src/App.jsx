@@ -5,11 +5,13 @@ import { DEFAULT_CODE } from './rall/samples';
 import { parseRall } from './rall/parser';
 import { interpretRall } from './rall/interpreter';
 
+const BASE_URL = import.meta.env.BASE_URL;
+
 const HOLD_MODEL_PATHS = {
-  jug: '/rall/models/holds/jug.glb',
-  crimp: '/rall/models/holds/crimp.glb',
-  sloper: '/rall/models/holds/sloper.glb',
-  pinch: '/rall/models/holds/pinch.glb',
+  jug: `${BASE_URL}models/holds/jug.glb`,
+  crimp: `${BASE_URL}models/holds/crimp.glb`,
+  sloper: `${BASE_URL}models/holds/sloper.glb`,
+  pinch: `${BASE_URL}models/holds/pinch.glb`,
 };
 
 function PrimitiveHold({ type, color, position }) {
@@ -114,10 +116,10 @@ function HoldMesh({ type, color, position, useRealModels }) {
   );
 }
 
-useGLTF.preload('/models/holds/jug.glb');
-useGLTF.preload('/models/holds/crimp.glb');
-useGLTF.preload('/models/holds/sloper.glb');
-useGLTF.preload('/models/holds/pinch.glb');
+useGLTF.preload(HOLD_MODEL_PATHS.jug);
+useGLTF.preload(HOLD_MODEL_PATHS.crimp);
+useGLTF.preload(HOLD_MODEL_PATHS.sloper);
+useGLTF.preload(HOLD_MODEL_PATHS.pinch);
 
 function RouteLabels({ wall }) {
   return (
@@ -331,7 +333,7 @@ export default function App() {
 
   async function loadExample(fileName) {
     try {
-      const response = await fetch(`/examples/${fileName}`);
+      const response = await fetch(`${BASE_URL}examples/${fileName}`);
 
       if (!response.ok) {
         throw new Error(`Could not load ${fileName}`);
