@@ -1,0 +1,23 @@
+wall MultiWall {
+  height 15
+  width 10
+  angle 12
+}
+
+route "Green Route" on MultiWall {
+  color "green"
+  grade "V1"
+
+  hold "jug" at (2, 2, 0.18)
+  hold "jug" at (2, 5, 0.18)
+  hold "jug" at (2, 8, 0.18)
+}
+
+route "Red Route" on MultiWall {
+  color "red"
+  grade "V4"
+
+  hold "crimp" at (6, 2, 0.18)
+  hold "pinch" at (6.5, 5, 0.18)
+  hold "sloper" at (7, 9, 0.18)
+}

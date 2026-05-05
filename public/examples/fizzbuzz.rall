@@ -1,0 +1,17 @@
+wall FizzBuzzWall {
+  height 18
+  width 12
+  angle 5
+}
+
+for i from 1 to 100 {
+  if i % 15 == 0 {
+    hold "sloper"
+  } else if i % 3 == 0 {
+    hold "crimp"
+  } else if i % 5 == 0 {
+    hold "pinch"
+  } else {
+    hold "jug"
+  }
+}
