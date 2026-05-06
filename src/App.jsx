@@ -10,8 +10,8 @@ const BASE_URL = import.meta.env.BASE_URL;
 
 const HOLD_MODEL_PATHS = {
   jug: `${BASE_URL}models/holds/jug.glb`,
-  crimp: `${BASE_URL}models/holds/crimp.glb`,
   sloper: `${BASE_URL}models/holds/sloper.glb`,
+  crimp: `${BASE_URL}models/holds/crimp.glb`,
   pinch: `${BASE_URL}models/holds/pinch.glb`,
 };
 
@@ -95,14 +95,14 @@ function PrimitiveHold({ type, color, position }) {
       )}
 
       {type === 'sloper' && (
-        <mesh {...meshProps} position={[0, 0, 0.19]} rotation={[0, 0, 0.2]}>
-          <sphereGeometry args={[0.3, 28, 28, 0, Math.PI * 2, 0, Math.PI / 1.9]} />
+        <mesh {...meshProps} position={[0, 0, 0.15]} rotation={[0, 0, 0]}>
+          <sphereGeometry args={[0.3, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <meshStandardMaterial {...materialProps} />
         </mesh>
       )}
 
       {type === 'pinch' && (
-        <mesh {...meshProps} position={[0, 0, 0.18]} rotation={[0, 0, 0.55]}>
+        <mesh {...meshProps} position={[0, 0, 0.0]} rotation={[0, 0, 0.55]}>
           <cylinderGeometry args={[0.12, 0.18, 0.46, 22]} />
           <meshStandardMaterial {...materialProps} />
         </mesh>
@@ -178,17 +178,17 @@ function HoldModel({ type, color, position }) {
   }, [scene, color]);
 
   const rotationMap = {
-    jug: [0, 0, 0.15],
-    crimp: [0, 0, -0.1],
-    sloper: [0, 0, 0.2],
-    pinch: [0, 0, 0.55],
+    jug: [1.3, 0.5, 0.15],
+    crimp: [1, 1, 0.3],
+    sloper: [3, -0.4, 1.1],
+    pinch: [1, 1.5, 0.5],
   };
 
   const scaleMap = {
-    jug: 0.01,
-    crimp: 0.5,
-    sloper: 0.01,
-    pinch: 0.5,
+    jug: 0.005,
+    crimp: 1.2,
+    sloper: 0.25,
+    pinch: 0.3,
   };
 
   return (
@@ -203,13 +203,19 @@ function HoldModel({ type, color, position }) {
 }
 
 function HoldMesh({ type, color, position, useRealModels }) {
+  const adjustedPosition = [
+    position[0],
+    position[1],
+    position[2] + (type === 'sloper' ? 0.25 : 0) + (type === 'pinch' ? 0.001 : 0),
+  ];
+
   if (!useRealModels || !HOLD_MODEL_PATHS[type]) {
-    return <PrimitiveHold type={type} color={color} position={position} />;
+    return <PrimitiveHold type={type} color={color} position={adjustedPosition} />;
   }
 
   return (
-    <Suspense fallback={<PrimitiveHold type={type} color={color} position={position} />}>
-      <HoldModel type={type} color={color} position={position} />
+    <Suspense fallback={<PrimitiveHold type={type} color={color} position={adjustedPosition} />}>
+      <HoldModel type={type} color={color} position={adjustedPosition} />
     </Suspense>
   );
 }
@@ -440,7 +446,7 @@ function mapHoldToFace(hold, wall) {
     faceKey,
     localX,
     y,
-    z: FACE_DEPTH / 2 + 0.014 + zExtra,
+    z: FACE_DEPTH / 3 + 0.002 + zExtra,
   };
 }
 
@@ -517,7 +523,7 @@ function ClimbingWall({ wall, routes, useRealModels }) {
           size={0.65}
           depth={0.55}
           rotation={-0.5}
-          color={COLORS.pinkDark}
+          color={COLORS.woodLight}
         />
 
         <HoldsForFace
@@ -621,7 +627,7 @@ function ClimbingWall({ wall, routes, useRealModels }) {
           size={0.75}
           depth={0.6}
           rotation={-0.65}
-          color={COLORS.orange}
+          color={COLORS.woodLight}
         />
 
         <HoldsForFace
