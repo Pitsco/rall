@@ -1,141 +1,250 @@
 import React, { Suspense, useMemo, useState } from 'react';
+import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Text, useGLTF } from '@react-three/drei';
+import { OrbitControls, useGLTF } from '@react-three/drei';
 import { DEFAULT_CODE } from './rall/samples';
 import { parseRall } from './rall/parser';
 import { interpretRall } from './rall/interpreter';
 
+const BASE_URL = import.meta.env.BASE_URL;
+
 const HOLD_MODEL_PATHS = {
-  jug: '/rall/models/holds/jug.glb',
-  crimp: '/rall/models/holds/crimp.glb',
-  sloper: '/rall/models/holds/sloper.glb',
-  pinch: '/rall/models/holds/pinch.glb',
+  jug: `${BASE_URL}models/holds/jug.glb`,
+  sloper: `${BASE_URL}models/holds/sloper.glb`,
+  crimp: `${BASE_URL}models/holds/crimp.glb`,
+  pinch: `${BASE_URL}models/holds/pinch.glb`,
 };
 
+const WALL_HEIGHT = 7.2;
+const CENTER_WIDTH = 5.8;
+const SIDE_WIDTH = 3.0;
+const TOTAL_FLAT_WIDTH = CENTER_WIDTH + SIDE_WIDTH * 2;
+const FACE_DEPTH = 0.14;
+const SIDE_ANGLE = 0.32;
+
+const COLORS = {
+  wood: '#dec7a4',
+  woodLight: '#ead8b8',
+  woodDark: '#cbb894',
+  pink: '#c91452',
+  pinkDark: '#8f0a32',
+  orange: '#ef6b25',
+  burgundy: '#7a071f',
+  mat: '#303438',
+  matLine: '#202428',
+  bolt: '#4f4a42',
+};
+
+const FACE_LAYOUT = {
+  left: {
+    flatCenterX: -CENTER_WIDTH / 2 - SIDE_WIDTH / 2,
+    width: SIDE_WIDTH,
+  },
+  center: {
+    flatCenterX: 0,
+    width: CENTER_WIDTH,
+  },
+  right: {
+    flatCenterX: CENTER_WIDTH / 2 + SIDE_WIDTH / 2,
+    width: SIDE_WIDTH,
+  },
+};
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function toNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function centerForHingedPanel(hingeX, hingeZ, localXAtHinge, rotationY) {
+  const xOffset = localXAtHinge * Math.cos(rotationY);
+  const zOffset = -localXAtHinge * Math.sin(rotationY);
+
+  return [hingeX - xOffset, WALL_HEIGHT / 2, hingeZ - zOffset];
+}
+
 function PrimitiveHold({ type, color, position }) {
-  const materialProps = { color, roughness: 0.82, metalness: 0.03 };
-  const common = { castShadow: true, receiveShadow: true, position };
+  const materialProps = {
+    color,
+    roughness: 0.82,
+    metalness: 0.03,
+  };
 
-  if (type === 'jug') {
-    return (
-      <mesh {...common} rotation={[0.2, -0.3, 0.1]}>
-        <sphereGeometry args={[0.24, 28, 28]} />
-        <meshStandardMaterial {...materialProps} />
-      </mesh>
-    );
-  }
-
-  if (type === 'crimp') {
-    return (
-      <mesh {...common} rotation={[0.15, 0.12, 0.1]}>
-        <boxGeometry args={[0.42, 0.16, 0.18]} />
-        <meshStandardMaterial {...materialProps} />
-      </mesh>
-    );
-  }
-
-  if (type === 'sloper') {
-    return (
-      <mesh {...common} rotation={[0.75, 0.2, 0]}>
-        <sphereGeometry args={[0.3, 28, 28, 0, Math.PI * 2, 0, Math.PI / 1.9]} />
-        <meshStandardMaterial {...materialProps} />
-      </mesh>
-    );
-  }
-
-  if (type === 'pinch') {
-    return (
-      <mesh {...common} rotation={[0.2, 0.3, 0.55]}>
-        <cylinderGeometry args={[0.12, 0.18, 0.46, 22]} />
-        <meshStandardMaterial {...materialProps} />
-      </mesh>
-    );
-  }
+  const meshProps = {
+    castShadow: true,
+    receiveShadow: true,
+  };
 
   return (
-    <mesh {...common}>
-      <dodecahedronGeometry args={[0.22, 0]} />
-      <meshStandardMaterial {...materialProps} />
-    </mesh>
+    <group position={position}>
+      {type === 'jug' && (
+        <mesh {...meshProps} position={[0, 0, 0.24]} rotation={[0, 0, 0.15]}>
+          <sphereGeometry args={[0.24, 28, 28]} />
+          <meshStandardMaterial {...materialProps} />
+        </mesh>
+      )}
+
+      {type === 'crimp' && (
+        <mesh {...meshProps} position={[0, 0, 0.09]} rotation={[0, 0, -0.1]}>
+          <boxGeometry args={[0.42, 0.16, 0.18]} />
+          <meshStandardMaterial {...materialProps} />
+        </mesh>
+      )}
+
+      {type === 'sloper' && (
+        <mesh {...meshProps} position={[0, 0, 0.15]} rotation={[0, 0, 0]}>
+          <sphereGeometry args={[0.3, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial {...materialProps} />
+        </mesh>
+      )}
+
+      {type === 'pinch' && (
+        <mesh {...meshProps} position={[0, 0, 0.0]} rotation={[0, 0, 0.55]}>
+          <cylinderGeometry args={[0.12, 0.18, 0.46, 22]} />
+          <meshStandardMaterial {...materialProps} />
+        </mesh>
+      )}
+
+      {!['jug', 'crimp', 'sloper', 'pinch'].includes(type) && (
+        <mesh {...meshProps} position={[0, 0, 0.2]}>
+          <dodecahedronGeometry args={[0.22, 0]} />
+          <meshStandardMaterial {...materialProps} />
+        </mesh>
+      )}
+    </group>
   );
 }
 
 function HoldModel({ type, color, position }) {
   const { scene } = useGLTF(HOLD_MODEL_PATHS[type]);
-  const model = useMemo(() => scene.clone(), [scene]);
 
-  model.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
+  const { model, correction } = useMemo(() => {
+    const cloned = scene.clone(true);
 
-      if (child.material) {
-        child.material = child.material.clone();
-        child.material.color.set(color);
-        child.material.roughness = 0.85;
-        child.material.metalness = 0.03;
+    cloned.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material = child.material.map((material) => {
+              const clonedMaterial = material.clone();
+
+              if (clonedMaterial.color) {
+                clonedMaterial.color.set(color);
+              }
+
+              clonedMaterial.roughness = 0.85;
+              clonedMaterial.metalness = 0.03;
+
+              return clonedMaterial;
+            });
+          } else {
+            child.material = child.material.clone();
+
+            if (child.material.color) {
+              child.material.color.set(color);
+            }
+
+            child.material.roughness = 0.85;
+            child.material.metalness = 0.03;
+          }
+        }
       }
+    });
+
+    cloned.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(cloned);
+
+    if (box.isEmpty()) {
+      return {
+        model: cloned,
+        correction: [0, 0, 0],
+      };
     }
-  });
+
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+
+    return {
+      model: cloned,
+      correction: [-center.x, -center.y, -box.min.z],
+    };
+  }, [scene, color]);
 
   const rotationMap = {
-    jug: [0.2, -0.3, 0.1],
-    crimp: [0.15, 0.12, 0.1],
-    sloper: [0.75, 0.2, 0],
-    pinch: [0.2, 0.3, 0.55],
+    jug: [1.3, 0.5, 0.15],
+    crimp: [1, 1, 0.3],
+    sloper: [3, -0.4, 1.1],
+    pinch: [1, 1.5, 0.5],
   };
 
   const scaleMap = {
-    jug: 0.01,
-    crimp: 0.5,
-    sloper: 0.01,
-    pinch: 0.5,
+    jug: 0.005,
+    crimp: 1.2,
+    sloper: 0.25,
+    pinch: 0.3,
   };
 
   return (
-    <primitive
-      object={model}
+    <group
       position={position}
       rotation={rotationMap[type] || [0, 0, 0]}
       scale={scaleMap[type] || 0.02}
-    />
+    >
+      <primitive object={model} position={correction} />
+    </group>
   );
 }
 
 function HoldMesh({ type, color, position, useRealModels }) {
+  const adjustedPosition = [
+    position[0],
+    position[1],
+    position[2] + (type === 'sloper' ? 0.25 : 0) + (type === 'pinch' ? 0.001 : 0),
+  ];
+
   if (!useRealModels || !HOLD_MODEL_PATHS[type]) {
-    return <PrimitiveHold type={type} color={color} position={position} />;
+    return <PrimitiveHold type={type} color={color} position={adjustedPosition} />;
   }
 
   return (
-    <Suspense fallback={<PrimitiveHold type={type} color={color} position={position} />}>
-      <HoldModel type={type} color={color} position={position} />
+    <Suspense fallback={<PrimitiveHold type={type} color={color} position={adjustedPosition} />}>
+      <HoldModel type={type} color={color} position={adjustedPosition} />
     </Suspense>
   );
 }
 
-useGLTF.preload('/models/holds/jug.glb');
-useGLTF.preload('/models/holds/crimp.glb');
-useGLTF.preload('/models/holds/sloper.glb');
-useGLTF.preload('/models/holds/pinch.glb');
+Object.values(HOLD_MODEL_PATHS).forEach((path) => {
+  if (path) {
+    useGLTF.preload(path);
+  }
+});
 
-function RouteLabels({ wall }) {
-  return (
-    <Text position={[wall.width / 2, wall.height + 2.0, 0.35]} fontSize={0.48} color="#4b5563" anchorX="center" anchorY="middle">
-      {wall.name}
-    </Text>
-  );
-}
-
-function PanelBoltHoles({ width, height, spacingX = 0.78, spacingY = 0.78, z = 0.155, offsetX = 0, offsetY = 0 }) {
+function PanelBoltHoles({ width, height, spacingX = 0.48, spacingY = 0.48 }) {
   const holes = [];
+  const z = FACE_DEPTH / 2 + 0.009;
 
-  for (let x = 0.5; x <= width - 0.5; x += spacingX) {
-    for (let y = 0.5; y <= height - 0.5; y += spacingY) {
+  for (let x = -width / 2 + 0.34; x <= width / 2 - 0.34; x += spacingX) {
+    for (let y = -height / 2 + 0.34; y <= height / 2 - 0.34; y += spacingY) {
       holes.push(
-        <mesh key={`${offsetX + x}-${offsetY + y}`} position={[offsetX + x, offsetY + y, z]}>
-          <cylinderGeometry args={[0.028, 0.028, 0.025, 12]} />
-          <meshStandardMaterial color="#8e8a84" roughness={1} metalness={0} />
+        <mesh
+          key={`${x.toFixed(2)}-${y.toFixed(2)}`}
+          renderOrder={-10}
+          position={[x, y, z]}
+        >
+          <circleGeometry args={[0.017, 10]} />
+          <meshStandardMaterial
+            color={COLORS.bolt}
+            roughness={1}
+            metalness={0}
+            depthWrite={false}
+          />
         </mesh>
       );
     }
@@ -144,157 +253,496 @@ function PanelBoltHoles({ width, height, spacingX = 0.78, spacingY = 0.78, z = 0
   return <>{holes}</>;
 }
 
-function FrontPanels({ wall }) {
+function SurfaceRect({ x, y, width, height, color, layer = 1 }) {
+  const z = FACE_DEPTH / 2 + 0.003 + layer * 0.001;
+
   return (
-    <group>
-      <mesh
-        receiveShadow
-        castShadow
-        position={[wall.width / 2, wall.height / 2, 0]}
-      >
-        <boxGeometry args={[wall.width, wall.height, 0.3]} />
-        <meshStandardMaterial
-          color="#d8d4ce"
-          roughness={0.98}
-          metalness={0.01}
+    <mesh renderOrder={-20 + layer} position={[x, y, z]}>
+      <planeGeometry args={[width, height]} />
+      <meshStandardMaterial
+        color={color}
+        roughness={0.92}
+        metalness={0}
+        side={THREE.FrontSide}
+        depthTest={false}
+        depthWrite={false}
+        polygonOffset
+        polygonOffsetFactor={-2 - layer}
+        polygonOffsetUnits={-2 - layer}
+      />
+    </mesh>
+  );
+}
+
+function SurfacePolygon({ points, color, layer = 1 }) {
+  const geometry = useMemo(() => {
+    const shape = new THREE.Shape();
+
+    shape.moveTo(points[0][0], points[0][1]);
+
+    for (let i = 1; i < points.length; i += 1) {
+      shape.lineTo(points[i][0], points[i][1]);
+    }
+
+    shape.closePath();
+
+    return new THREE.ShapeGeometry(shape);
+  }, [points]);
+
+  const z = FACE_DEPTH / 2 + 0.003 + layer * 0.001;
+
+  return (
+    <mesh renderOrder={-20 + layer} position={[0, 0, z]}>
+      <primitive attach="geometry" object={geometry} />
+      <meshStandardMaterial
+        color={color}
+        roughness={0.92}
+        metalness={0}
+        side={THREE.FrontSide}
+        depthTest={false}
+        depthWrite={false}
+        polygonOffset
+        polygonOffsetFactor={-2 - layer}
+        polygonOffsetUnits={-2 - layer}
+      />
+    </mesh>
+  );
+}
+
+function BoxVolume({
+  x,
+  y,
+  width = 1,
+  height = 1,
+  depth = 0.55,
+  rotation = 0,
+  color = COLORS.woodLight,
+}) {
+  return (
+    <mesh
+      receiveShadow
+      castShadow
+      position={[x, y, FACE_DEPTH / 2 + depth / 2 + 0.006]}
+      rotation={[0, 0, rotation]}
+    >
+      <boxGeometry args={[width, height, depth]} />
+      <meshStandardMaterial color={color} roughness={0.95} metalness={0.01} />
+    </mesh>
+  );
+}
+
+function TriangularVolume({
+  x,
+  y,
+  size = 1,
+  depth = 0.65,
+  rotation = 0,
+  color = COLORS.woodLight,
+}) {
+  const geometry = useMemo(() => {
+    const r = size;
+
+    const vertices = [
+      0, r, 0,
+      -r * 0.9, -r * 0.55, 0,
+      r * 0.9, -r * 0.55, 0,
+      0, 0, depth,
+    ];
+
+    // No back face, so it does not z-fight with the wall.
+    const indices = [
+      0, 3, 1,
+      1, 3, 2,
+      2, 3, 0,
+    ];
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+
+    return geo;
+  }, [size, depth]);
+
+  return (
+    <mesh
+      receiveShadow
+      castShadow
+      position={[x, y, FACE_DEPTH / 2 + 0.006]}
+      rotation={[0, 0, rotation]}
+    >
+      <primitive attach="geometry" object={geometry} />
+      <meshStandardMaterial
+        color={color}
+        roughness={0.95}
+        metalness={0.01}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
+function WallFace({
+  width,
+  height,
+  position,
+  rotation = [0, 0, 0],
+  color = COLORS.wood,
+  children,
+}) {
+  return (
+    <group position={position} rotation={rotation}>
+      <mesh receiveShadow castShadow renderOrder={-30}>
+        <boxGeometry args={[width, height, FACE_DEPTH]} />
+        <meshStandardMaterial color={color} roughness={0.96} metalness={0.01} />
+      </mesh>
+
+      {children}
+
+      <PanelBoltHoles width={width} height={height} />
+    </group>
+  );
+}
+
+function mapHoldToFace(hold, wall) {
+  const sourceWidth = Math.max(toNumber(wall?.width, TOTAL_FLAT_WIDTH), 1);
+  const sourceHeight = Math.max(toNumber(wall?.height, WALL_HEIGHT), 1);
+
+  const rawX = toNumber(hold.x, sourceWidth / 2);
+  const rawY = toNumber(hold.y, sourceHeight / 2);
+  const rawZ = toNumber(hold.z, 0);
+
+  const xFlat = clamp(
+    (rawX / sourceWidth - 0.5) * TOTAL_FLAT_WIDTH,
+    -TOTAL_FLAT_WIDTH / 2 + 0.28,
+    TOTAL_FLAT_WIDTH / 2 - 0.28
+  );
+
+  const y = clamp(
+    (rawY / sourceHeight) * WALL_HEIGHT,
+    0.35,
+    WALL_HEIGHT - 0.35
+  );
+
+  let faceKey = 'center';
+
+  if (xFlat < -CENTER_WIDTH / 2) {
+    faceKey = 'left';
+  } else if (xFlat > CENTER_WIDTH / 2) {
+    faceKey = 'right';
+  }
+
+  const face = FACE_LAYOUT[faceKey];
+
+  const localX = clamp(
+    xFlat - face.flatCenterX,
+    -face.width / 2 + 0.25,
+    face.width / 2 - 0.25
+  );
+
+  const zExtra = clamp(rawZ, 0, 0.025);
+
+  return {
+    faceKey,
+    localX,
+    y,
+    z: FACE_DEPTH / 3 + 0.002 + zExtra,
+  };
+}
+
+function HoldsForFace({ faceKey, wall, routes, useRealModels }) {
+  return routes.flatMap((route) =>
+    (route.holds || []).map((hold, index) => {
+      const mapped = mapHoldToFace(hold, wall);
+
+      if (mapped.faceKey !== faceKey) {
+        return null;
+      }
+
+      return (
+        <HoldMesh
+          key={`${route.name}-${faceKey}-${index}`}
+          type={hold.type}
+          color={hold.color || route.color || '#ef4444'}
+          position={[mapped.localX, mapped.y - WALL_HEIGHT / 2, mapped.z]}
+          useRealModels={useRealModels}
         />
-      </mesh>
-
-      <PanelBoltHoles width={wall.width} height={wall.height} />
-    </group>
-  );
-}
-function LeftWing({ wall }) {
-  const width = 2.9;
-  const height = wall.height - 1.4;
-
-  return (
-    <group position={[-1.55, 0.7, -0.95]} rotation={[0, 0.24, 0]}>
-      <mesh receiveShadow castShadow position={[width / 2, height / 2, 0]}>
-        <boxGeometry args={[width, height, 0.3]} />
-        <meshStandardMaterial color="#d7d3cd" roughness={0.98} metalness={0.01} />
-      </mesh>
-      <PanelBoltHoles width={width} height={height} />
-    </group>
+      );
+    })
   );
 }
 
-function RightWing({ wall }) {
-  const width = 3.2;
-  const height = wall.height - 1.0;
-
-  return (
-    <group position={[wall.width + 1.6, 0.5, -1.05]} rotation={[0, -0.35, 0]}>
-      <mesh receiveShadow castShadow position={[width / 2, height / 2, 0]}>
-        <boxGeometry args={[width, height, 0.3]} />
-        <meshStandardMaterial color="#d7d2cb" roughness={0.98} metalness={0.01} />
-      </mesh>
-      <PanelBoltHoles width={width} height={height} />
-    </group>
+function ClimbingWall({ wall, routes, useRealModels }) {
+  const leftCenter = centerForHingedPanel(
+    -CENTER_WIDTH / 2,
+    0,
+    SIDE_WIDTH / 2,
+    SIDE_ANGLE
   );
-}
 
-function TopOverhang({ wall }) {
-  const width = wall.width * 0.46;
-  const height = 2.3;
-
-  return (
-    <group position={[wall.width * 0.35, wall.height - 0.3, -0.85]} rotation={[0.32, 0, 0]}>
-      <mesh receiveShadow castShadow position={[width / 2, height / 2, 0]}>
-        <boxGeometry args={[width, height, 0.3]} />
-        <meshStandardMaterial color="#d3cfc8" roughness={0.98} metalness={0.01} />
-      </mesh>
-      <PanelBoltHoles width={width} height={height} />
-    </group>
+  const rightCenter = centerForHingedPanel(
+    CENTER_WIDTH / 2,
+    0,
+    -SIDE_WIDTH / 2,
+    -SIDE_ANGLE
   );
-}
-
-function Volumes() {
-  const volumeMaterial = { color: '#aaa39a', roughness: 0.95, metalness: 0.01 };
 
   return (
     <group>
-      <mesh receiveShadow castShadow position={[1.6, 6.0, 0.7]} rotation={[0.1, 0.35, 0]}>
-        <coneGeometry args={[0.65, 2.2, 4]} />
-        <meshStandardMaterial {...volumeMaterial} />
-      </mesh>
+      {/* Left connected wall panel */}
+      <WallFace
+        width={SIDE_WIDTH}
+        height={WALL_HEIGHT}
+        position={leftCenter}
+        rotation={[0, SIDE_ANGLE, 0]}
+        color={COLORS.wood}
+      >
+        <SurfaceRect
+          x={-0.35}
+          y={-WALL_HEIGHT / 2 + 0.85}
+          width={2.3}
+          height={1.7}
+          color={COLORS.pink}
+          layer={2}
+        />
 
-      <mesh receiveShadow castShadow position={[4.7, 2.7, 0.62]} rotation={[0.25, -0.6, 0.22]}>
-        <boxGeometry args={[1.25, 0.95, 0.95]} />
-        <meshStandardMaterial {...volumeMaterial} />
-      </mesh>
+        <SurfacePolygon
+          color={COLORS.orange}
+          layer={3}
+          points={[
+            [-SIDE_WIDTH / 2, -1.1],
+            [SIDE_WIDTH / 2, -0.55],
+            [SIDE_WIDTH / 2, 0.15],
+            [-SIDE_WIDTH / 2, -0.35],
+          ]}
+        />
 
-      <mesh receiveShadow castShadow position={[6.3, 7.0, 0.8]} rotation={[0.45, 0.15, 0.08]}>
-        <coneGeometry args={[0.82, 1.7, 3]} />
-        <meshStandardMaterial {...volumeMaterial} />
-      </mesh>
+        <TriangularVolume
+          x={-0.25}
+          y={0.55}
+          size={0.65}
+          depth={0.55}
+          rotation={-0.5}
+          color={COLORS.woodLight}
+        />
 
-      <mesh receiveShadow castShadow position={[8.2, 4.9, 0.74]} rotation={[0.18, 0.52, 0.1]}>
-        <coneGeometry args={[0.72, 1.9, 4]} />
-        <meshStandardMaterial {...volumeMaterial} />
-      </mesh>
+        <HoldsForFace
+          faceKey="left"
+          wall={wall}
+          routes={routes}
+          useRealModels={useRealModels}
+        />
+      </WallFace>
+
+      {/* Main center wall panel */}
+      <WallFace
+        width={CENTER_WIDTH}
+        height={WALL_HEIGHT}
+        position={[0, WALL_HEIGHT / 2, 0]}
+        color={COLORS.woodLight}
+      >
+        {/* Subtle plywood-style facets */}
+        <SurfacePolygon
+          color="#e4d0ad"
+          layer={1}
+          points={[
+            [-CENTER_WIDTH / 2, -WALL_HEIGHT / 2],
+            [-0.7, -WALL_HEIGHT / 2],
+            [-1.6, -1.25],
+            [-CENTER_WIDTH / 2, -0.35],
+          ]}
+        />
+
+        <SurfacePolygon
+          color="#d8c39f"
+          layer={1}
+          points={[
+            [-1.4, 1.2],
+            [0.5, 2.95],
+            [CENTER_WIDTH / 2, 2.55],
+            [CENTER_WIDTH / 2, WALL_HEIGHT / 2],
+            [0.15, WALL_HEIGHT / 2],
+          ]}
+        />
+
+        <SurfacePolygon
+          color="#ead9ba"
+          layer={1}
+          points={[
+            [-CENTER_WIDTH / 2, 0.4],
+            [-0.3, 0.1],
+            [1.6, -1.4],
+            [-0.85, -2.1],
+          ]}
+        />
+
+        {/* Bottom magenta section */}
+        <SurfacePolygon
+          color={COLORS.pink}
+          layer={2}
+          points={[
+            [-CENTER_WIDTH / 2, -WALL_HEIGHT / 2],
+            [-1.2, -WALL_HEIGHT / 2],
+            [-0.4, -2.65],
+            [-CENTER_WIDTH / 2, -2.05],
+          ]}
+        />
+
+        {/* Orange diagonal band */}
+        <SurfacePolygon
+          color={COLORS.orange}
+          layer={3}
+          points={[
+            [-CENTER_WIDTH / 2, -2.2],
+            [1.9, -1.95],
+            [CENTER_WIDTH / 2, -1.35],
+            [CENTER_WIDTH / 2, -0.65],
+            [-1.6, -1.25],
+            [-CENTER_WIDTH / 2, -1.5],
+          ]}
+        />
+
+        <BoxVolume
+          x={-1.35}
+          y={-1.05}
+          width={1.2}
+          height={0.9}
+          depth={0.65}
+          rotation={0.22}
+          color={COLORS.wood}
+        />
+
+        <TriangularVolume
+          x={0.95}
+          y={0.55}
+          size={0.9}
+          depth={0.7}
+          rotation={0.4}
+          color={COLORS.woodLight}
+        />
+
+        <TriangularVolume
+          x={1.9}
+          y={-2.05}
+          size={0.75}
+          depth={0.6}
+          rotation={-0.65}
+          color={COLORS.woodLight}
+        />
+
+        <HoldsForFace
+          faceKey="center"
+          wall={wall}
+          routes={routes}
+          useRealModels={useRealModels}
+        />
+      </WallFace>
+
+      {/* Right connected wall panel */}
+      <WallFace
+        width={SIDE_WIDTH}
+        height={WALL_HEIGHT}
+        position={rightCenter}
+        rotation={[0, -SIDE_ANGLE, 0]}
+        color={COLORS.wood}
+      >
+        <SurfacePolygon
+          color={COLORS.orange}
+          layer={2}
+          points={[
+            [-SIDE_WIDTH / 2, -WALL_HEIGHT / 2],
+            [0.25, -WALL_HEIGHT / 2],
+            [SIDE_WIDTH / 2, -1.85],
+            [SIDE_WIDTH / 2, 2.35],
+            [-SIDE_WIDTH / 2, 1.7],
+          ]}
+        />
+
+        <SurfacePolygon
+          color={COLORS.orange}
+          layer={2}
+          points={[
+            [-SIDE_WIDTH / 2, 1.9],
+            [SIDE_WIDTH / 2, 2.45],
+            [SIDE_WIDTH / 2, WALL_HEIGHT / 2],
+            [-0.45, WALL_HEIGHT / 2],
+          ]}
+        />
+
+        <SurfaceRect
+          x={0.92}
+          y={1.15}
+          width={0.85}
+          height={4.65}
+          color={COLORS.burgundy}
+          layer={3}
+        />
+
+        <BoxVolume
+          x={0.05}
+          y={0.85}
+          width={1.05}
+          height={0.85}
+          depth={0.55}
+          rotation={-0.12}
+          color={COLORS.woodLight}
+        />
+
+        <HoldsForFace
+          faceKey="right"
+          wall={wall}
+          routes={routes}
+          useRealModels={useRealModels}
+        />
+      </WallFace>
     </group>
   );
 }
 
-function FloorPads({ wall }) {
-  const totalWidth = wall.width + 8;
-  const padCount = 4;
-  const padWidth = totalWidth / padCount;
-  const pads = [];
+function FloorBase() {
+  const seams = [];
 
-  for (let i = 0; i < padCount; i += 1) {
-    pads.push(
-      <mesh key={i} receiveShadow castShadow position={[wall.width / 2 - totalWidth / 2 + padWidth / 2 + i * padWidth, -1.42, 1.05]}>
-        <boxGeometry args={[padWidth - 0.05, 1.05, 6.2]} />
-        <meshStandardMaterial color="#7b7c80" roughness={0.92} metalness={0.01} />
+  for (let i = -3; i <= 3; i += 1) {
+    seams.push(
+      <mesh key={i} position={[i * 1.85, 0.018, 2.85]}>
+        <boxGeometry args={[0.025, 0.018, 5.7]} />
+        <meshStandardMaterial color={COLORS.matLine} roughness={1} />
       </mesh>
     );
   }
 
-  return <>{pads}</>;
-}
-
-function FloorBase({ wall }) {
   return (
     <>
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[wall.width / 2, -2.0, 0]}>
-        <planeGeometry args={[50, 30]} />
-        <meshStandardMaterial color="#eee8de" roughness={1} metalness={0} />
+      {/* Concrete room floor */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.12, 3]}>
+        <planeGeometry args={[24, 16]} />
+        <meshStandardMaterial color="#d7d7d4" roughness={1} />
       </mesh>
 
-      <FloorPads wall={wall} />
+      {/* Bouldering mat: top is exactly y = 0, so it touches the wall bottom */}
+      <mesh receiveShadow castShadow position={[0, -0.1, 2.85]}>
+        <boxGeometry args={[13.4, 0.2, 5.7]} />
+        <meshStandardMaterial color={COLORS.mat} roughness={0.96} />
+      </mesh>
+
+      {seams}
     </>
   );
 }
 
 function WallScene({ data, useRealModels }) {
-  const { wall, routes } = data;
-  const wallCenterX = wall.width / 2;
-  const angleRad = (-wall.angle * Math.PI) / 180;
+  const wall = data.wall;
+  const routes = data.routes || [];
 
   return (
-    <group rotation={[angleRad, 0, 0]} position={[-wallCenterX, -7.4, 0]}>
-      <FloorBase wall={wall} />
-      <LeftWing wall={wall} />
-      <RightWing wall={wall} />
-      <TopOverhang wall={wall} />
-      <FrontPanels wall={wall} />
-      <Volumes />
+    <group position={[0, 0, 0]}>
+      <FloorBase />
 
-      {routes.map((route) =>
-        route.holds.map((hold, index) => (
-          <HoldMesh
-            key={`${route.name}-${index}`}
-            type={hold.type}
-            color={hold.color || route.color}
-            position={[hold.x, hold.y, hold.z]}
-            useRealModels={useRealModels}
-          />
-        ))
-      )}
-
-      <RouteLabels wall={wall} />
+      <ClimbingWall
+        wall={wall}
+        routes={routes}
+        useRealModels={useRealModels}
+      />
     </group>
   );
 }
@@ -306,9 +754,16 @@ function Legend({ routes }) {
 
       <div className="mt-3 space-y-2">
         {routes.map((route) => (
-          <div key={route.name} className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2">
+          <div
+            key={route.name}
+            className="flex items-center justify-between rounded-xl bg-stone-50 px-3 py-2"
+          >
             <div className="flex items-center gap-3">
-              <span className="h-4 w-4 rounded-full border border-stone-300" style={{ backgroundColor: route.color }} />
+              <span
+                className="h-4 w-4 rounded-full border border-stone-300"
+                style={{ backgroundColor: route.color }}
+              />
+
               <div>
                 <div className="font-medium text-slate-900">{route.name}</div>
                 <div className="text-sm text-slate-500">{route.holds.length} holds</div>
@@ -331,7 +786,7 @@ export default function App() {
 
   async function loadExample(fileName) {
     try {
-      const response = await fetch(`/examples/${fileName}`);
+      const response = await fetch(`${BASE_URL}examples/${fileName}`);
 
       if (!response.ok) {
         throw new Error(`Could not load ${fileName}`);
@@ -394,7 +849,9 @@ export default function App() {
             </div>
 
             <div className="mt-4">
-              <div className="mb-2 text-sm font-semibold text-slate-700">Load Example Programs</div>
+              <div className="mb-2 text-sm font-semibold text-slate-700">
+                Load Example Programs
+              </div>
 
               <div className="flex flex-wrap gap-2">
                 <button
@@ -451,8 +908,12 @@ export default function App() {
           <div className="rounded-3xl bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between rounded-2xl bg-stone-50 px-3 py-2">
               <div>
-                <div className="text-sm font-semibold text-slate-800">Hold rendering</div>
-                <div className="text-xs text-slate-500">Uses .glb models from public/models/holds when available</div>
+                <div className="text-sm font-semibold text-slate-800">
+                  Hold rendering
+                </div>
+                <div className="text-xs text-slate-500">
+                  Uses .glb models from public/models/holds when available
+                </div>
               </div>
 
               <button
@@ -466,7 +927,9 @@ export default function App() {
               </button>
             </div>
 
-            <label className="mb-2 block text-sm font-semibold text-slate-700">Rall Source</label>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Rall Source
+            </label>
 
             <textarea
               value={code}
@@ -496,7 +959,7 @@ export default function App() {
             )}
           </div>
 
-          {parsed.data && <Legend routes={parsed.data.routes} />}
+          {parsed.data && <Legend routes={parsed.data.routes || []} />}
         </div>
 
         <div className="rounded-3xl bg-white p-3 shadow-sm">
@@ -509,29 +972,36 @@ export default function App() {
 
           <div className="h-[780px] overflow-hidden rounded-[2rem] bg-[#f4eee4]">
             {parsed.data ? (
-              <Canvas shadows camera={{ position: [8.5, 5.8, 22], fov: 28 }}>
+              <Canvas shadows camera={{ position: [0, 3.8, 15.5], fov: 38 }}>
                 <color attach="background" args={['#f4eee4']} />
+
                 <ambientLight intensity={1.15} />
 
                 <directionalLight
-                  position={[12, 18, 14]}
+                  position={[8, 11, 11]}
                   intensity={1.35}
                   castShadow
                   shadow-mapSize-width={2048}
                   shadow-mapSize-height={2048}
                 />
 
-                <directionalLight position={[-8, 10, 8]} intensity={0.45} />
+                <directionalLight position={[-8, 8, 8]} intensity={0.45} />
 
-                <spotLight position={[0, 20, 18]} intensity={0.55} angle={0.45} penumbra={0.8} castShadow />
+                <spotLight
+                  position={[0, 12, 10]}
+                  intensity={0.45}
+                  angle={0.5}
+                  penumbra={0.8}
+                  castShadow
+                />
 
                 <WallScene data={parsed.data} useRealModels={useRealModels} />
 
                 <OrbitControls
                   makeDefault
-                  minDistance={12}
-                  maxDistance={32}
-                  target={[0, 0.5, 0]}
+                  minDistance={8}
+                  maxDistance={24}
+                  target={[0, 3.25, 1.05]}
                   maxPolarAngle={Math.PI / 2.05}
                 />
               </Canvas>
